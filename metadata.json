@@ -1,0 +1,7 @@
+{
+  "name": "Class-Track AI",
+  "description": "A high-performance AI-based Attendance Management System using Facial Recognition for schools and universities.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
