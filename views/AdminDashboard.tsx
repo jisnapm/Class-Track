@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { AppState, UserRole, User, ClassSession } from '../types';
+import React, { useState } from 'react';
+import { AppState, UserRole, User } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 interface AdminDashboardProps {
@@ -10,176 +10,328 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, updateState, onLogout }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'users'>('overview');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
+
   const { users, classes, attendance } = state;
+
+  const handleTogglePermission = (userId: string) => {
+    updateState(prev => ({
+      ...prev,
+      users: prev.users.map(u => 
+        u.id === userId ? { ...u, canReenroll: !u.canReenroll } : u
+      )
+    }));
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (userId === state.currentUser?.id) {
+      alert("Security Error: You cannot delete your own administrative account.");
+      return;
+    }
+    
+    if (confirm("Are you sure you want to permanently delete this user? All biometric data will be wiped.")) {
+      updateState(prev => ({
+        ...prev,
+        users: prev.users.filter(u => u.id !== userId)
+      }));
+    }
+  };
+
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   const stats = [
     { label: 'Total Students', value: users.filter(u => u.role === UserRole.STUDENT).length, color: 'text-blue-600', icon: '👥' },
     { label: 'Faculties', value: users.filter(u => u.role === UserRole.TEACHER).length, color: 'text-indigo-600', icon: '👨‍🏫' },
     { label: 'Active Classes', value: classes.length, color: 'text-purple-600', icon: '🏫' },
-    { label: 'Records Logged', value: attendance.length, color: 'text-green-600', icon: '📝' },
+    { label: 'System Uptime', value: '99.9%', color: 'text-green-600', icon: '⚡' },
   ];
 
   const roleData = [
-    { name: 'Students', value: users.filter(u => u.role === UserRole.STUDENT).length },
-    { name: 'Teachers', value: users.filter(u => u.role === UserRole.TEACHER).length },
-    { name: 'Admins', value: users.filter(u => u.role === UserRole.ADMIN).length },
+    { name: 'Students', value: users.filter(u => u.role === UserRole.STUDENT).length, color: '#3b82f6' },
+    { name: 'Teachers', value: users.filter(u => u.role === UserRole.TEACHER).length, color: '#6366f1' },
+    { name: 'Admins', value: users.filter(u => u.role === UserRole.ADMIN).length, color: '#a855f7' },
   ];
 
-  const COLORS = ['#3b82f6', '#6366f1', '#a855f7'];
-
   return (
-    <div className="flex-1 flex overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
-        <div className="p-6">
-          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <span className="p-1.5 bg-blue-100 rounded-lg">CT</span>
-            Class-Track
-          </h2>
+    <div className="flex-1 flex flex-col md:flex-row h-screen bg-gray-50 overflow-hidden">
+      {/* Navigation Sidebar */}
+      <aside className="w-full md:w-72 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-8">
+          <div className="flex items-center space-x-3 mb-10">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">
+              CT
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-gray-900 tracking-tight leading-none">Class-Track</h2>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Administrator</span>
+            </div>
+          </div>
+
+          <nav className="space-y-2">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'overview' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-xl">📊</span>
+              <span>Overview</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('users')}
+              className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl font-bold transition-all ${
+                activeTab === 'users' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-xl">👥</span>
+              <span>Manage Users</span>
+            </button>
+          </nav>
         </div>
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <a href="#" className="flex items-center space-x-3 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl font-medium">
-            <span>📊</span> <span>Overview</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl transition-all">
-            <span>👥</span> <span>Manage Users</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl transition-all">
-            <span>🏫</span> <span>Classes</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl transition-all">
-            <span>🛡️</span> <span>AI Settings</span>
-          </a>
-        </nav>
-        <div className="p-4 border-t border-gray-100">
-          <button onClick={onLogout} className="flex items-center space-x-3 text-red-600 hover:bg-red-50 w-full px-4 py-3 rounded-xl transition-all">
-            <span>🚪</span> <span>Logout</span>
+
+        <div className="mt-auto p-8 border-t border-gray-100">
+          <div className="flex items-center space-x-3 mb-6 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+            <img src={state.currentUser?.avatar} className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt="Admin" />
+            <div className="overflow-hidden">
+              <p className="text-sm font-bold text-gray-900 truncate">{state.currentUser?.name}</p>
+              <p className="text-[10px] text-gray-400 font-bold truncate">Root Privileges</p>
+            </div>
+          </div>
+          <button 
+            onClick={onLogout} 
+            className="w-full flex items-center justify-center space-x-2 bg-white text-red-600 border-2 border-red-50 py-3 rounded-2xl font-black text-sm hover:bg-red-50 transition-all uppercase tracking-widest"
+          >
+            <span>🚪</span>
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-6 md:p-10">
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Command Center</h1>
-            <p className="text-gray-500">Managing institutional intelligence and records</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button className="bg-white p-2 rounded-xl shadow-sm border border-gray-200">
-              🔔
-            </button>
-            <div className="flex items-center space-x-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
-              <img src={state.currentUser?.avatar} className="w-8 h-8 rounded-full" alt="Profile" />
-              <span className="font-medium text-sm">{state.currentUser?.name}</span>
-            </div>
-          </div>
-        </header>
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
+        {activeTab === 'overview' ? (
+          <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <header>
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight">System Health</h1>
+              <p className="text-gray-500 font-medium mt-1">Real-time biometrics and enrollment monitoring.</p>
+            </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {stats.map((stat, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-400">{stat.label}</p>
-                <p className={`text-2xl font-bold ${stat.color} mt-1`}>{stat.value}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {stats.map((stat, i) => (
+                <div key={i} className="bg-white p-7 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-shadow">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                    <p className={`text-3xl font-black ${stat.color} mt-2`}>{stat.value}</p>
+                  </div>
+                  <div className="text-3xl bg-gray-50 w-14 h-14 flex items-center justify-center rounded-2xl group-hover:scale-110 transition-transform">
+                    {stat.icon}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-bold text-gray-900">Enrollment Distribution</h3>
+                  <div className="flex space-x-2">
+                    <div className="flex items-center space-x-1.5"><div className="w-3 h-3 rounded-full bg-blue-500"></div><span className="text-[10px] font-bold text-gray-400 uppercase">Students</span></div>
+                    <div className="flex items-center space-x-1.5"><div className="w-3 h-3 rounded-full bg-indigo-500"></div><span className="text-[10px] font-bold text-gray-400 uppercase">Teachers</span></div>
+                  </div>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={roleData}>
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 600}} />
+                      <YAxis hide />
+                      <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                        {roleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <div className="text-3xl">{stat.icon}</div>
-            </div>
-          ))}
-        </div>
 
-        {/* Visual Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-          <div className="lg:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold mb-6 text-gray-800">Enrollment by Role</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={roleData}>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Account Balance</h3>
+                <p className="text-sm text-gray-400 font-medium mb-8">User type breakdown across institution.</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie 
+                        data={roleData} 
+                        innerRadius={60} 
+                        outerRadius={80} 
+                        paddingAngle={8} 
+                        dataKey="value"
+                      >
+                        {roleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3 mt-6">
+                  {roleData.map((role, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: role.color}}></div>
+                        <span className="font-bold text-gray-600">{role.name}</span>
+                      </div>
+                      <span className="font-black text-gray-900">{role.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold mb-6 text-gray-800">Role Distribution</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={roleData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {roleData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
+        ) : (
+          <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <h1 className="text-4xl font-black text-gray-900 tracking-tight">Manage Users</h1>
+                <p className="text-gray-500 font-medium mt-1">Total database capacity: {users.length} unique identities.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                  <input 
+                    type="text" 
+                    placeholder="Search by name or email..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-2xl w-full sm:w-64 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-sm"
+                  />
+                </div>
+                <select 
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value as any)}
+                  className="px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold text-sm text-gray-600"
+                >
+                  <option value="ALL">All Roles</option>
+                  <option value={UserRole.STUDENT}>Students</option>
+                  <option value={UserRole.TEACHER}>Teachers</option>
+                  <option value={UserRole.ADMIN}>Admins</option>
+                </select>
+              </div>
+            </header>
 
-        {/* Users Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-800">Recent Users</h3>
-            <button className="text-blue-600 font-semibold text-sm hover:underline">View All</button>
+            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 text-gray-400 text-[10px] uppercase tracking-[0.2em] font-black">
+                    <tr>
+                      <th className="px-8 py-6">Personal Identity</th>
+                      <th className="px-8 py-6">Biometric Status</th>
+                      <th className="px-8 py-6">Control Access</th>
+                      <th className="px-8 py-6 text-right">Database Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-8 py-20 text-center">
+                          <div className="text-5xl mb-4">🔦</div>
+                          <p className="text-gray-400 font-bold">No users found matching your search parameters.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map(user => (
+                        <tr key={user.id} className="group hover:bg-gray-50/50 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-4">
+                              <div className="relative">
+                                <img src={user.avatar} className="w-12 h-12 rounded-2xl border-2 border-white shadow-sm" alt="" />
+                                {user.role === UserRole.ADMIN && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white">⭐</div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-gray-900 text-base leading-tight">{user.name}</p>
+                                <p className="text-xs font-medium text-gray-400 mt-0.5">{user.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            {user.role === UserRole.STUDENT ? (
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-2.5 h-2.5 rounded-full ${user.enrolledFaces?.length ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-amber-500 animate-pulse'}`} />
+                                <div className="flex flex-col">
+                                  <span className={`text-[11px] font-black uppercase tracking-wider ${user.enrolledFaces?.length ? 'text-green-700' : 'text-amber-700'}`}>
+                                    {user.enrolledFaces?.length ? 'Verified Dataset' : 'Dataset Pending'}
+                                  </span>
+                                  {user.enrolledFaces?.length && (
+                                    <span className="text-[10px] text-gray-400 font-bold">{user.enrolledFaces.length} Angles Stored</span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-gray-300 font-black uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">Exempt</span>
+                            )}
+                          </td>
+                          <td className="px-8 py-6">
+                            {user.role === UserRole.STUDENT && (
+                              <div className="flex items-center space-x-2">
+                                <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
+                                  user.canReenroll 
+                                  ? 'bg-green-50 text-green-600 border-green-100' 
+                                  : 'bg-gray-50 text-gray-400 border-gray-200'
+                                }`}>
+                                  {user.canReenroll ? 'Face Reset Granted' : 'Locked Mode'}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              {user.role === UserRole.STUDENT && (
+                                <button 
+                                  onClick={() => handleTogglePermission(user.id)}
+                                  className={`p-2.5 rounded-xl transition-all border-2 ${
+                                    user.canReenroll 
+                                    ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' 
+                                    : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'
+                                  }`}
+                                  title={user.canReenroll ? "Revoke Permission" : "Grant Face Reset"}
+                                >
+                                  {user.canReenroll ? '🔒' : '🔑'}
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => handleDeleteUser(user.id)}
+                                disabled={user.id === state.currentUser?.id}
+                                className={`p-2.5 rounded-xl border-2 transition-all ${
+                                  user.id === state.currentUser?.id 
+                                  ? 'opacity-20 cursor-not-allowed border-gray-200' 
+                                  : 'bg-white text-gray-400 border-gray-100 hover:text-red-600 hover:border-red-200 hover:bg-red-50'
+                                }`}
+                                title="Delete Account"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="px-6 py-4">User</th>
-                  <th className="px-6 py-4">Role</th>
-                  <th className="px-6 py-4">Email</th>
-                  <th className="px-6 py-4">Face Status</th>
-                  <th className="px-6 py-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {users.map(user => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 flex items-center space-x-3">
-                      <img src={user.avatar} className="w-10 h-10 rounded-full border border-gray-200" alt="" />
-                      <span className="font-semibold text-gray-800">{user.name}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        user.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' :
-                        user.role === UserRole.TEACHER ? 'bg-indigo-100 text-indigo-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{user.email}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center ${user.enrolledFace ? 'text-green-600' : 'text-amber-500'}`}>
-                        {user.enrolledFace ? '✅ Verified' : '⚠️ Pending'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                        ⚙️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   );

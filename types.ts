@@ -9,10 +9,12 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string; // Added for login verification
   role: UserRole;
   avatar?: string;
-  enrolledFace?: string; // Deprecated but kept for backward compatibility
+  enrolledFace?: string; // Deprecated
   enrolledFaces?: string[]; // Array of base64 strings (Front, Left, Right)
+  canReenroll?: boolean; // Permission flag granted by Admin
 }
 
 export interface ClassSession {
